@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Settings, Zap, TrendingUp, TrendingDown,
   ShieldCheck, RefreshCw, Wifi, FlaskConical,
-  AlertTriangle, LayoutDashboard, Radio, BookOpen,
-  ChevronRight, Plus, Activity, CheckCircle2, XCircle,
+  AlertTriangle, Activity, CheckCircle2,
   Loader2,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
@@ -134,9 +133,9 @@ function Sidebar({
   wallet: { connected: boolean; shortAddress: string | null; isOnBSC: boolean };
 }) {
   const navItems = [
-    { id: "watchlist", label: "Watchlist",  icon: LayoutDashboard, badge: null },
-    { id: "signals",   label: "Signals",    icon: Radio,            badge: pendingCount > 0 ? pendingCount : null },
-    { id: "tradelog",  label: "Trade Log",  icon: BookOpen,         badge: tradeCount > 0 ? tradeCount : null },
+    { id: "watchlist", label: "Watchlist",  icon: Wifi,             badge: null },
+    { id: "signals",   label: "Signals",    icon: Zap,              badge: pendingCount > 0 ? pendingCount : null },
+    { id: "tradelog",  label: "Trade Log",  icon: Activity,         badge: tradeCount > 0 ? tradeCount : null },
   ] as const;
 
   return (
@@ -661,7 +660,7 @@ function Dashboard() {
 
         {/* Stat cards */}
         <div className="flex flex-wrap gap-4 px-6 py-5" style={{ borderBottom: `1px solid ${C.slate2}` }}>
-          <StatCard icon={LayoutDashboard} label="Tokens Tracked" value={`${tokens.length}`} sub="All active" />
+          <StatCard icon={Wifi} label="Tokens Tracked" value={`${tokens.length}`} sub="All active" />
           <StatCard
             icon={TrendingUp}
             label="Avg Net Spread"
@@ -670,7 +669,7 @@ function Dashboard() {
             valueColor={avgNet > 0 ? C.green : C.red}
           />
           <StatCard
-            icon={Radio}
+            icon={Zap}
             label="Signals Pending"
             value={`${pendingCount}`}
             sub="Awaiting your approval"

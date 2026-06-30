@@ -14,7 +14,6 @@ const RED    = "#DC2626";
 const SLATE8 = "#1E293B";
 const SLATE5 = "#64748B";
 const SLATE2 = "#E2E8F0";
-const SLATE1 = "#F1F5F9";
 const WHITE  = "#FFFFFF";
 
 interface TokenImportProps {

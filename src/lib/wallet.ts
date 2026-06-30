@@ -36,7 +36,8 @@ export async function connectWallet(): Promise<ConnectedWallet> {
   }
 
   const { ethers } = await import("ethers");
-  const provider = new ethers.BrowserProvider(window.ethereum as Parameters<typeof ethers.BrowserProvider>[0]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const provider = new ethers.BrowserProvider(window.ethereum as any);
 
   await provider.send("eth_requestAccounts", []);
   const signer = await provider.getSigner();

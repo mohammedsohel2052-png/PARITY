@@ -4,7 +4,8 @@ import type { WatchlistToken, ArbSignal, TradeLogEntry } from "../types";
 // since we don't have a live Supabase DB instance connection string yet.
 
 class MockSupabaseTable<T extends { id?: string | number; token_symbol?: string }> {
-  constructor(private tableName: string) {}
+  private tableName: string;
+  constructor(tableName: string) { this.tableName = tableName; }
 
   private getData(): T[] {
     try {
