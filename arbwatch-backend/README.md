@@ -1,6 +1,6 @@
-# arbwatch-backend
+# parity
 
-TODO: what this pod does and who operates it.
+Parity is an AI-judged, human-approved BSC arbitrage co-pilot — PancakeSwap ↔ Binance.
 
 ## Build loop
 ```bash

@@ -1,13 +1,13 @@
-# ArbWatch 🔍⚡
+# Parity 🔍⚡
 
-> AI-judged, human-approved cross-venue arbitrage co-pilot for BSC
+> AI-judged, human-approved BSC arbitrage co-pilot — PancakeSwap ↔ Binance, net of fees, slippage & gas.
 > Built for the **Gappy AI Hackathon** | June 30, 2026 | Arise To Ascend
 
 ---
 
 ## What It Does
 
-ArbWatch watches a trader's BSC token shortlist for real price gaps between **PancakeSwap (DEX)** and **Binance (CEX)**.
+**Parity** watches a trader's BSC token shortlist for real price gaps between **PancakeSwap (DEX)** and **Binance (CEX)**.
 
 The pipeline:
 1. **Detects** price gaps using live Dexscreener + Binance public APIs
@@ -16,7 +16,7 @@ The pipeline:
 4. **Human approves** — you see the full cost breakdown and AI note before clicking Approve
 5. **Simulated execution** runs the full pipeline, logs the result, sends a Telegram alert
 
-**This is not a black-box autotrader.** It's a transparent decision pipeline — deterministic math where math is correct, AI judgment where judgment is needed, human in the loop wherever real consequences exist.
+**Parity is not a black-box autotrader.** It's a transparent decision pipeline — deterministic math where math is correct, AI judgment where judgment is needed, human in the loop wherever real consequences exist.
 
 ---
 
@@ -37,33 +37,33 @@ The pipeline:
 
 ```
 Parity/
-├── src/                        # React frontend
-│   ├── App.tsx                 # Main dashboard
+├── src/                          # React frontend
+│   ├── App.tsx                   # Main dashboard
 │   ├── components/
-│   │   ├── WalletConnect.tsx   # MetaMask connect
-│   │   ├── TokenImport.tsx     # BEP-20 import + validation
-│   │   ├── SignalCard.tsx      # Signal with cost breakdown + AI note
-│   │   ├── TradeLog.tsx        # Simulated trade history
-│   │   └── ProfitBreakdown.tsx # Inline fee/slippage/gas breakdown
+│   │   ├── WalletConnect.tsx     # MetaMask connect
+│   │   ├── TokenImport.tsx       # BEP-20 import + validation
+│   │   ├── SignalCard.tsx        # Signal with cost breakdown + AI note
+│   │   ├── TradeLog.tsx          # Simulated trade history
+│   │   └── ProfitBreakdown.tsx   # Inline fee/slippage/gas breakdown
 │   ├── hooks/
-│   │   ├── useWallet.ts        # EIP-1193 wallet state
-│   │   ├── useArbScan.ts       # Live price scanning + profit engine
-│   │   └── useTradeLog.ts      # Simulated execution + P&L tracking
+│   │   ├── useWallet.ts          # EIP-1193 wallet state
+│   │   ├── useArbScan.ts         # Live price scanning + profit engine
+│   │   └── useTradeLog.ts        # Simulated execution + P&L tracking
 │   ├── lib/
-│   │   ├── profitEngine.ts     # Fee/slippage/gas math (PRD §6.4)
-│   │   ├── dexscreener.ts      # Dexscreener API client
-│   │   ├── binance.ts          # Binance ticker client
-│   │   └── wallet.ts           # EIP-1193 wallet helpers
-│   └── types/index.ts          # Shared TypeScript types
+│   │   ├── profitEngine.ts       # Fee/slippage/gas math
+│   │   ├── dexscreener.ts        # Dexscreener API client
+│   │   ├── binance.ts            # Binance ticker client
+│   │   └── wallet.ts             # EIP-1193 wallet helpers
+│   └── types/index.ts            # Shared TypeScript types
 │
-└── arbwatch-backend/           # Lemma pod (backend)
+└── arbwatch-backend/             # Lemma pod (backend)
     ├── functions/
-    │   ├── check-arb-opportunity.py    # DEX + CEX price fetch
-    │   ├── estimate-net-profit.py      # Cost model (exact PRD §6.4)
-    │   └── simulate-trade-execution.py # Simulated fill + Telegram
-    ├── agents/arb-analyst.yaml         # AI judgment agent
-    ├── workflows/scan_watchlist.yaml   # Full pipeline workflow
-    └── tables/                         # watchlist, arb_signals, trade_log, wallet_connections
+    │   ├── check-arb-opportunity.py     # DEX + CEX price fetch
+    │   ├── estimate-net-profit.py       # Cost model
+    │   └── simulate-trade-execution.py  # Simulated fill + Telegram
+    ├── agents/arb-analyst.yaml          # AI judgment agent
+    ├── workflows/scan_watchlist.yaml    # Full pipeline workflow
+    └── tables/                          # watchlist, arb_signals, trade_log, wallet_connections
 ```
 
 ---
@@ -114,16 +114,16 @@ Then open http://localhost:5173
 |---|---|---|
 | CAKE | `0x0e09fabb73bd3ade0a17ecc321fd13a19e81ce82` | CAKEUSDT |
 | BTCB | `0x7130d2a12b9bcbfae4f2634d864a1ee1ce3ead9c` | BTCUSDT |
-| ETH | `0x2170ed0880ac9a755fd29b2688956bd959f933f8` | ETHUSDT |
-| BNB | `0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c` | BNBUSDT |
-| XRP | `0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe` | XRPUSDT |
-| ADA | `0x3ee2200efb3400fabb9aacf31297cbdd1d435d47` | ADAUSDT |
+| ETH  | `0x2170ed0880ac9a755fd29b2688956bd959f933f8` | ETHUSDT |
+| BNB  | `0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c` | BNBUSDT |
+| XRP  | `0x1d2f0da169ceb9fc7b3144628db156f3f6c60dbe` | XRPUSDT |
+| ADA  | `0x3ee2200efb3400fabb9aacf31297cbdd1d435d47` | ADAUSDT |
 
 ---
 
 ## Built By
 
-**Arise To Ascend** — Mohammed Sohel  
+**Arise To Ascend** — Mohammed Sohel
 Gappy AI Hackathon | June 24–30, 2026
 
 > Not financial advice. All demo executions are simulated. No real funds move.

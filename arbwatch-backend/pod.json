@@ -1,5 +1,5 @@
 {
   "format_version": 2,
-  "name": "arbwatch",
-  "description": "TODO: one line on what this pod does"
+  "name": "parity",
+  "description": "AI-judged, human-approved BSC arbitrage co-pilot. PancakeSwap vs Binance, net of fees, slippage & gas."
 }

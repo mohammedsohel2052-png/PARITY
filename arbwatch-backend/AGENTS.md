@@ -5,7 +5,7 @@ The bundle is the source of truth. Edit files, then re-import.
 
 ## Layout (folder name MUST equal each resource's `name`)
 ```
-arbwatch-backend/
+parity-backend/
   pod.json
   tables/<name>/<name>.json
   functions/<name>/<name>.json + code.py     # JSON carries permissions.grants
