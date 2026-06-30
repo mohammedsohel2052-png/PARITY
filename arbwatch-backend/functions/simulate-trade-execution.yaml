@@ -1,0 +1,4 @@
+name: simulate-trade-execution
+runtime: python3
+entrypoint: simulate-trade-execution.py
+description: Simulates an arbitrage trade and records simulated execution slip.

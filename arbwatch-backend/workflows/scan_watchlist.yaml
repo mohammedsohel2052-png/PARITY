@@ -1,0 +1,49 @@
+name: scan_watchlist
+description: Scans the watchlist, costs the spread, asks agent for judgment, and requires approval to simulate.
+trigger:
+  type: cron
+  schedule: "*/5 * * * *" # Every 5 minutes
+
+steps:
+  - id: fetch_prices
+    type: function
+    function: check-arb-opportunity
+    inputs:
+      bsc_token_address: "{{ input.bsc_token_address }}"
+      cex_symbol: "{{ input.cex_symbol }}"
+      trade_size_usd: "{{ input.trade_size_usd }}"
+
+  - id: estimate_profit
+    type: function
+    function: estimate-net-profit
+    inputs:
+      dex_price_usd: "{{ steps.fetch_prices.output.dex_price_usd }}"
+      cex_price_usd: "{{ steps.fetch_prices.output.cex_price_usd }}"
+      dex_liquidity_usd: "{{ steps.fetch_prices.output.dex_liquidity_usd }}"
+      trade_size_usd: "{{ steps.fetch_prices.output.trade_size_usd }}"
+
+  - id: agent_judgment
+    type: agent
+    agent: arb-analyst
+    inputs:
+      token_symbol: "{{ input.token_symbol }}"
+      dex_price_usd: "{{ steps.estimate_profit.output.dex_price_usd }}"
+      cex_price_usd: "{{ steps.estimate_profit.output.cex_price_usd }}"
+      dex_liquidity_usd: "{{ steps.estimate_profit.output.dex_liquidity_usd }}"
+      trade_size_usd: "{{ steps.estimate_profit.output.trade_size_usd }}"
+      gross_spread_usd: "{{ steps.estimate_profit.output.gross_spread_usd }}"
+      net_profit_usd: "{{ steps.estimate_profit.output.net_profit_usd }}"
+      net_profit_pct: "{{ steps.estimate_profit.output.net_profit_pct }}"
+
+  - id: human_approval
+    type: approval
+    description: "Approve simulated execution for {{ input.token_symbol }} (Est. Net: ${{ steps.estimate_profit.output.net_profit_usd }})"
+
+  - id: simulate_execution
+    type: function
+    function: simulate-trade-execution
+    inputs:
+      signal_id: "{{ input.signal_id }}"
+      token_symbol: "{{ input.token_symbol }}"
+      net_profit_usd: "{{ steps.estimate_profit.output.net_profit_usd }}"
+      net_profit_pct: "{{ steps.estimate_profit.output.net_profit_pct }}"

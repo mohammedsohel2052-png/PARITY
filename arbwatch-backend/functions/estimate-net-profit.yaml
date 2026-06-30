@@ -1,0 +1,4 @@
+name: estimate-net-profit
+runtime: python3
+entrypoint: estimate-net-profit.py
+description: Calculates net profitability after DEX fee, CEX fee, slippage, and gas.

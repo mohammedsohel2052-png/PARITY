@@ -1,0 +1,6 @@
+name: wallet_connections
+schema:
+  pod_member: text
+  wallet_address: text
+  chain: text
+  connected_at: date

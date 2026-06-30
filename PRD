@@ -1,0 +1,396 @@
+# ArbWatch — Product Requirements Document
+> AI-judged, human-approved cross-venue arbitrage co-pilot for BSC
+> Built on Lemma SDK | Gappy AI Hackathon | Submission due June 30, 2026
+
+This PRD supersedes the earlier one-page build plan — same core idea, expanded with wallet connect, token import, a real fee/slippage-aware profit check, and a wallet-generation feature, scoped against the time actually left today.
+
+---
+
+## 0. Read This First
+
+Per the hackathon reference doc, **today is the submission deadline.** That changes how this PRD has to be used: it is deliberately split into a **Tier 0 build** (what you can realistically finish and demo today) and a **Tier 2 vision** (the full wallet + live-execution product, fully specified so you can build it this week, but not something to wire up live with real funds in the next few hours).
+
+Everything you asked for is in here — wallet connect, token import, profit-secured execution, an in-app wallet like MetaMask. The one judgment call I'm making for you: **live execution defaults to simulated/paper mode for the submission.** Real cross-venue execution touches real money, a CEX trading API key, and an unaudited smart-contract interaction — shipping that for the first time inside a same-day build is how teams lose funds, not how they win hackathons. The full architecture for going live is written out in section 6.9 so it's a fast follow, not a rewrite.
+
+If you only have a few hours, build top-to-bottom through **Tier 0** and stop — that alone is a stronger, more complete submission than the original plan.
+
+---
+
+## 1. Product Vision
+
+**ArbWatch** watches a trader's BSC token shortlist for real price gaps between PancakeSwap and Binance, has an AI agent sanity-check whether the gap survives fees and slippage, and only acts after the human approves — connecting their own wallet, importing their own tokens, and (in simulated mode for today) executing the trade end to end with a logged, explainable outcome.
+
+The pitch to judges: this is not a black-box autotrader. It's a transparent decision pipeline — deterministic math where math is correct, AI judgment where judgment is needed, and a human in the loop wherever real consequences exist. That's a more credible, more fundable story than "fully autonomous bot," and it's also literally how Lemma is designed to be used (Functions for rules, Agents for judgment, Approvals for consequence).
+
+---
+
+## 2. Problem Statement
+
+A trader watching a handful of BSC tokens has no fast way to know, at any moment, whether PancakeSwap and Binance have drifted apart enough to be worth acting on — and even when a gap shows up, eyeballing a raw percentage doesn't tell you if it survives PancakeSwap's swap fee, Binance's trading fee, slippage on a thin pool, and BSC gas. Most "spreads" people see on dashboards are not actually profitable once real costs are counted. ArbWatch automates both the watching and the costing, and stops short of pulling the trigger without a human saying yes.
+
+---
+
+## 3. Users & Use Case
+
+**Primary user:** a self-directed crypto trader (you) running a personal shortlist of 5–15 BSC tokens, who wants pre-costed, pre-judged alerts instead of raw spread numbers, and wants to connect their own wallet rather than hand custody to a bot.
+
+**Core scenario:** open the app → connect wallet → paste in a new token to track → the system scans on a schedule or on demand → a signal shows up with a plain-English read on whether it's real → approve → see the (simulated, for today) trade result logged with actual numbers.
+
+---
+
+## 4. Goals & Non-Goals
+
+**Goals**
+- A fully working core loop, demoable end-to-end in under two minutes, by the submission deadline.
+- Deep, idiomatic use of Lemma's primitives — Tables, Files, Agents, Functions, Workflows, Approvals, Surfaces, Apps — not just one table and a chatbot.
+- An honestly-scoped profit check: net of fees and slippage, not raw spread.
+- A wallet-connect flow that's real (reads your actual address, actual chain) even though execution is simulated.
+
+**Non-Goals (explicitly, for this submission)**
+- This is **not** shipping a custodial product, and it does not hold, transmit, or store any private key or seed phrase anywhere outside the user's own browser memory.
+- This is **not** moving real funds in the demo. The submitted build trades in simulation.
+- This is **not** a substitute for a real security audit, which any version of this touching live funds would need before going further.
+
+---
+
+## 5. Scope Tiers
+
+### Tier 0 — Build and demo today
+1. Wallet connect (MetaMask/injected provider, read address + chain, no fund movement)
+2. Token import (paste a BEP-20 address → validated → added to watchlist)
+3. Spread detection (existing: Dexscreener vs Binance)
+4. **Net profitability engine** — fees + slippage + gas modeled in, not just raw spread
+5. Arb Analyst agent — judges net profit realism, writes a plain-English note
+6. Approval gate
+7. **Simulated trade execution** — full pipeline runs, fill is simulated, result is logged
+8. Telegram alert with the final, costed outcome
+
+### Tier 1 — If hours remain
+- Per-token configurable demo trade size
+- A small "Portfolio" view showing simulated P&L across all logged trades
+- A second alert channel (Slack) alongside Telegram
+
+### Tier 2 — Documented, not built today
+- **Live execution**: real PancakeSwap swap + real Binance order, gated behind explicit confirmation
+- **In-app wallet generation** ("create a wallet" like MetaMask does) — non-custodial, client-side only
+- Multi-chain (Ethereum, Base) and multi-CEX (beyond Binance) expansion
+
+---
+
+## 6. Feature Specifications
+
+### 6.1 Wallet Connect (Tier 0)
+Connect an existing browser wallet (MetaMask or any EIP-1193 injected provider) to read the public address and confirm the chain is BSC. No signing of any value-moving transaction happens in this feature — it's identity, not custody.
+
+```ts
+import { ethers } from "ethers";
+
+async function connectWallet() {
+  if (!window.ethereum) throw new Error("No injected wallet found");
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  const signer = await provider.getSigner();
+  const address = await signer.getAddress();
+  const network = await provider.getNetwork();
+  if (network.chainId !== 56n) {
+    // Prompt a chain switch to BSC mainnet (or 97n for testnet during dev)
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: "0x38" }], // 56 in hex
+    });
+  }
+  return address;
+}
+```
+
+Store only the **public address** on a `wallet_connections` table, tied to the pod member. Never write a private key or signature to any table — there is never a legitimate reason to.
+
+### 6.2 Token Import (Tier 0)
+A form (built with Lemma's `useRecordForm` in function-backed mode) where the user pastes a BEP-20 contract address. On submit, the `import_token` workflow runs `validate-token`, which calls Dexscreener to confirm the address resolves to a real, liquid pair, pulls the symbol/name automatically, and only then writes the row — so the watchlist can't fill up with typos or dead contracts.
+
+### 6.3 Spread Detection (Tier 0, carried over)
+Unchanged from the original plan: the `check-arb-opportunity` function pulls DEX price from Dexscreener (`token-pairs/v1/bsc/{address}`, picking the highest-liquidity pair) and CEX price from Binance's public ticker, no API key needed for either.
+
+### 6.4 Net Profitability Engine (Tier 0 — new, this is the "secure some profit" check)
+A second, separate function — deterministic, no AI — that takes the raw spread and prices in real costs before anything gets called "profitable":
+
+```python
+def run(input_data):
+    dex_price = input_data["dex_price_usd"]
+    cex_price = input_data["cex_price_usd"]
+    dex_liquidity = input_data["dex_liquidity_usd"]
+    trade_size_usd = input_data.get("trade_size_usd", 500)
+
+    # PancakeSwap V2 swap fee ≈ 0.25%; Binance spot taker fee ≈ 0.10% (varies by VIP tier/BNB discount)
+    dex_fee_usd = trade_size_usd * 0.0025
+    cex_fee_usd = trade_size_usd * 0.0010
+
+    # Simple slippage haircut: bigger trade relative to pool liquidity = more slippage
+    pool_impact = trade_size_usd / max(dex_liquidity, 1)
+    estimated_slippage_pct = min(pool_impact * 50, 5.0)  # crude, conservative cap at 5%
+    slippage_usd = trade_size_usd * (estimated_slippage_pct / 100)
+
+    # BSC gas is cheap; a rough conservative estimate is fine for this check
+    estimated_gas_usd = 0.40
+
+    gross_spread_usd = trade_size_usd * abs(dex_price - cex_price) / min(dex_price, cex_price)
+    total_cost_usd = dex_fee_usd + cex_fee_usd + slippage_usd + estimated_gas_usd
+    net_profit_usd = gross_spread_usd - total_cost_usd
+    net_profit_pct = (net_profit_usd / trade_size_usd) * 100
+
+    return {
+        "dex_fee_usd": round(dex_fee_usd, 4),
+        "cex_fee_usd": round(cex_fee_usd, 4),
+        "estimated_slippage_pct": round(estimated_slippage_pct, 3),
+        "estimated_gas_usd": estimated_gas_usd,
+        "gross_spread_usd": round(gross_spread_usd, 4),
+        "net_profit_usd": round(net_profit_usd, 4),
+        "net_profit_pct": round(net_profit_pct, 3),
+    }
+```
+
+This is an **estimate, not a guarantee** — real fills can still slip further between detection and execution, and that caveat should show up in the UI copy, not just this doc. Treat the fee/slippage constants as configurable assumptions you can tune, not ground truth.
+
+### 6.5 Arb Analyst Agent (Tier 0, extended)
+Same agent as before, now judging the *output of the profitability function* rather than raw spread:
+
+```
+You are the Arb Analyst for ArbWatch. You're given a fully-costed opportunity:
+token_symbol, dex_price_usd, cex_price_usd, dex_liquidity_usd, trade_size_usd,
+gross_spread_usd, total estimated costs, and net_profit_usd / net_profit_pct.
+
+Decide whether this is a realistic opportunity or a false positive, then write
+one row to arb_signals with status "pending_approval".
+
+Rules of thumb:
+- net_profit_pct under 0.3% usually isn't worth the execution risk — say so.
+- Liquidity under $20k USD is too thin to trust the price even before costs.
+- A huge net_profit_pct (>8%) is more often stale or bad data than free money —
+  flag that suspicion rather than treating it as certain.
+- Always describe net_profit_usd as an estimate that assumes the price holds
+  between detection and execution — it can still move against the trade.
+
+Write risk_note as 1-2 plain-English sentences. Never mark a signal "approved"
+or move it past pending_approval yourself — that decision belongs to a human.
+```
+
+### 6.6 Approval Gate (Tier 0, carried over)
+One approval step, routed to the app (and optionally Telegram). Approve → triggers simulated execution + alert. Reject → signal closes with status `rejected`, nothing further happens.
+
+### 6.7 Simulated Trade Execution (Tier 0 — new, this is the "do trade from one platform to another")
+On approval, the workflow calls `simulate-trade-execution`: it applies a small additional randomized haircut to represent real-world fill slippage, computes a final simulated P&L, and writes a row to a new `trade_log` table tied to the connected wallet's public address. This is what "executes the trade" for the submission — the full pipeline really runs, the numbers are real math, the only thing that's simulated is the actual on-chain/on-exchange signature.
+
+Label this clearly in the UI as **Simulated Execution** — a small badge, not a disclaimer buried in settings. Judges respect honesty about this far more than they'd respect an unexplained black box.
+
+### 6.8 Alerts (Tier 0, carried over)
+Telegram message on completion, e.g.: *"CAKE: net profit estimate $4.10 (0.82%) after fees — simulated execution complete. DEX $2.41 → CEX $2.55."*
+
+### 6.9 [Tier 2] Live Execution — architecture, not for today
+If you take this further after the hackathon, here's the real shape of it:
+
+- **DEX leg:** the connected wallet signs an ERC20 `approve()` for the PancakeSwap V2 Router (`0x10ED43C718714eb63d5aA57B78B54704E256024E` on BSC mainnet — verified against PancakeSwap's own developer docs and BscScan), then a `swapExactTokensForTokens` call with a slippage-bounded `amountOutMin` and a short deadline.
+- **CEX leg:** requires a Binance API key with **trading** permission (not the public market-data endpoints used today). That key must live server-side only — as a Lemma Function secret, never in the React app bundle, never in a table, never in a chat log. Binance trading also requires completed KYC on the account.
+- **Why this isn't atomic:** unlike flash-loan arbitrage that stays entirely on one chain, a DEX↔CEX trade can't execute as a single atomic transaction — you need pre-positioned inventory on both venues (some token balance on-chain *and* stablecoin balance on Binance) and you accept execution-risk on each leg separately. The price can move between the two legs. "Net profit estimate" from section 6.4 is a pre-trade check, not a settlement guarantee.
+- **MEV exposure:** an on-chain swap broadcast to the public mempool can be sandwiched. A production version would want a private RPC / MEV-protected route (e.g. a protected transaction relay) rather than broadcasting plainly.
+- Build and test this on **BSC Testnet (chainId 97)** with testnet funds before ever pointing it at mainnet — verify the current testnet router address directly from PancakeSwap's developer docs at build time, since testnet deployments change more often than mainnet ones.
+
+I'm not a financial advisor and this isn't financial advice — this section is engineering architecture, and the realized profit/loss of any live version depends on execution risk that no pre-trade estimate fully captures.
+
+### 6.10 [Tier 2] In-App Wallet Generation — architecture, not for today
+A non-custodial wallet generator, similar in spirit to how MetaMask creates a new wallet, is genuinely simple to build:
+
+```ts
+import { ethers } from "ethers";
+
+function createNewWallet() {
+  const wallet = ethers.Wallet.createRandom();
+  return {
+    address: wallet.address,
+    mnemonic: wallet.mnemonic?.phrase, // shown ONCE, never persisted anywhere
+  };
+}
+```
+
+Non-negotiables if you build this:
+- The mnemonic/private key is generated and displayed **client-side only**, in browser memory or local component state. It must never be sent to a Lemma Function, written to a Lemma table, or appear in any log — Lemma tables are explicitly readable by other pod agents and members, which makes them the wrong place for key material under any circumstance.
+- Treat this as a feature that demonstrates wallet mechanics to judges, not a production custody product — it hasn't been security-audited, and nothing generating real keys should be trusted with meaningful funds without one.
+- Don't brand it "MetaMask" — that's someone else's trademark. "ArbWatch Wallet" or similar is the safe, simple call.
+
+---
+
+## 7. Lemma SDK Utilization Map
+
+| Primitive | Used as |
+|---|---|
+| **Tables** | `watchlist`, `arb_signals`, `trade_log`, `wallet_connections` |
+| **Files** | A markdown "Trading Playbook" — your fee assumptions, risk tolerance, and notes — searchable by the Arb Analyst agent before it judges a signal |
+| **Agents** | Arb Analyst — judgment on net profitability and false-positive risk |
+| **Functions** | `check-arb-opportunity` (price fetch), `estimate-net-profit` (fee/slippage math), `simulate-trade-execution` (simulated fill + logging), `validate-token` (import sanity check) |
+| **Workflows** | `scan_watchlist` (detect → cost → judge → approve → simulate → alert), `import_token` (validate → add to watchlist) |
+| **Approvals** | The human gate before any simulated (and later, live) execution |
+| **Apps** | The React dashboard — wallet connect, watchlist, signals, trade log |
+| **Surfaces** | Telegram for alerts and (optionally) approvals |
+| **Schedules** | CRON trigger on `scan_watchlist`, e.g. every 5 minutes |
+
+That's 8 of Lemma's primitives genuinely load-bearing, not decorative — worth saying explicitly in your submission write-up for the SDK-utilization criterion.
+
+---
+
+## 8. Data Model
+
+### `watchlist`
+| Column | Type | Notes |
+|---|---|---|
+| token_symbol | text | display label |
+| bsc_token_address | text | BEP-20 contract address |
+| cex_symbol | text | matching Binance ticker, e.g. `CAKEUSDT` |
+| min_net_profit_pct | number | alert threshold, post-fees |
+| trade_size_usd | number | assumed demo trade size for the profit calc, e.g. `500` |
+| status | text | `active` / `paused`, default `active` |
+| last_dex_price, last_cex_price, last_net_profit_pct | number | cached from last scan |
+| last_checked_at | date | |
+
+### `arb_signals`
+| Column | Type | Notes |
+|---|---|---|
+| watchlist_token | text | |
+| gross_spread_usd, net_profit_usd, net_profit_pct | number | from the profitability function |
+| risk_note | text | agent's judgment |
+| status | text | `pending_approval` / `approved` / `rejected` / `executed` |
+| detected_at | date | |
+
+### `trade_log`
+| Column | Type | Notes |
+|---|---|---|
+| signal_id | text | reference to `arb_signals` |
+| trade_mode | text | `simulated` (default) / `live` |
+| wallet_address | text | the connected public address — never a key |
+| simulated_net_profit_usd | number | |
+| executed_at | date | |
+| outcome_note | text | plain-English summary for the alert |
+
+### `wallet_connections`
+| Column | Type | Notes |
+|---|---|---|
+| pod_member | text | who connected |
+| wallet_address | text | public address only |
+| chain | text | `bsc` |
+| connected_at | date | |
+
+---
+
+## 9. Architecture
+
+```
+   ┌────────────┐   paste address    ┌───────────────┐
+   │   App UI   │ ─────────────────▶ │ import_token  │
+   │ (wallet    │                    │   workflow    │
+   │  connect)  │ ◀───────────────── │ validate-token │
+   └─────┬──────┘   added to list    └───────────────┘
+         │
+         │ Scan Now / CRON
+         ▼
+   ┌─────────────────┐     ┌──────────────────┐     ┌────────────────┐
+   │  check-arb-      │ ──▶ │ estimate-net-    │ ──▶ │  net_profit_pct │
+   │  opportunity     │     │ profit            │     │  ≥ threshold?   │
+   │  (function)      │     │  (function)       │     └────────┬────────┘
+   └─────────────────┘     └──────────────────┘              │ yes
+                                                                ▼
+                                                       ┌──────────────┐
+                                                       │ Arb Analyst  │
+                                                       │   (agent)    │
+                                                       └──────┬───────┘
+                                                              ▼
+                                                       ┌──────────────┐
+                                                       │  Approval    │
+                                                       └──────┬───────┘
+                                                  approved     │ rejected → stop
+                                                              ▼
+                                          ┌────────────────────────────┐
+                                          │ simulate-trade-execution    │
+                                          │ → trade_log → Telegram      │
+                                          └────────────────────────────┘
+```
+
+---
+
+## 10. Build Steps
+
+Organized as sessions, not clock times — collapse or skip sessions based on hours actually remaining. Stop after any session and you still have something submittable.
+
+**Session A — Foundation**
+- [ ] `lemma pod create arbwatch --with-starter`
+- [ ] Build `watchlist`, `arb_signals`, `trade_log`, `wallet_connections` tables
+- [ ] Seed 5–8 real watchlist rows (real token addresses from dexscreener.com/bsc)
+- [ ] Write + standalone-test `check-arb-opportunity` and `estimate-net-profit`
+
+**Session B — Judgment and approval loop**
+- [ ] Create the Arb Analyst agent, test from chat with a sample input
+- [ ] Build the `scan_watchlist` workflow: function → function → decision → agent → approval
+- [ ] Wire Telegram as the alert surface
+- [ ] Run the workflow by hand end-to-end until clean
+
+**Session C — Execution loop + token import**
+- [ ] Write `simulate-trade-execution`, wire it after approval
+- [ ] Write `validate-token`, build the `import_token` workflow
+- [ ] Build the import form with `useRecordForm` in function-backed mode
+
+**Session D — Frontend**
+- [ ] Scaffold the app (`lemma apps init` or clone a template shell)
+- [ ] Wallet connect button + connected-address display
+- [ ] Dashboard (watchlist + Scan Now), Signals (approve/reject), Trade Log views
+- [ ] Deploy: `npm run build && lemma app deploy arbwatch-app --pod-id <pod-id> --source-dir .`
+
+**Session E — Submit**
+- [ ] If real spreads are too quiet to demo, temporarily lower a threshold on 1–2 rows — say so plainly in the recording, judges understand seeded demos
+- [ ] Record the screen capture (script below)
+- [ ] Write the 2–3 sentence problem/approach summary
+- [ ] Submit before the deadline
+
+---
+
+## 11. Security & Risk Disclosures
+
+- No private key or seed phrase is ever stored in a Lemma table, sent to a Lemma Function, or logged anywhere — full stop. The only wallet data persisted is a public address.
+- The submitted build executes trades in **simulated mode only**. No real funds move.
+- Net-profit estimates are pre-trade calculations based on fee/slippage assumptions you control — they are not a guarantee of realized profit, and real execution risk (price movement between legs, MEV, partial fills) is not eliminated by this check.
+- This document and codebase are not financial or legal advice. Treat any path toward live execution as requiring its own security review before real funds touch it.
+
+---
+
+## 12. Demo Script
+
+1. Open the app, connect wallet — show the real address appear.
+2. Paste a new token's contract address into the import form — watch it validate and land on the dashboard.
+3. Click **Scan Now**. Narrate: "this prices the token on PancakeSwap and Binance, then runs a separate deterministic pass that subtracts swap fees, exchange fees, slippage, and gas before calling anything profitable."
+4. Open **Signals**, read the Arb Analyst's note aloud — this is the proof it's reasoning, not just diffing two numbers.
+5. Click **Approve**. Show the simulated execution complete and the Telegram alert land with the real costed numbers.
+6. Close on the trade log: "Everything left of Approve ran on its own. Everything right of it needed me to say yes — and even then, today it's simulated on purpose."
+
+---
+
+## 13. Submission Checklist
+
+- [ ] Core loop runs end-to-end without manual data-fixing mid-recording
+- [ ] Wallet connect visibly working
+- [ ] At least one real (or transparently seeded) signal reaches approval
+- [ ] Telegram alert lands on camera
+- [ ] Screen recording under whatever length Gappy's submission form allows
+- [ ] 2–3 sentence problem + approach summary written
+- [ ] Team details included
+- [ ] Submitted via the hackathon page before deadline
+
+---
+
+## Quick Reference
+
+| Resource | URL / Value |
+|---|---|
+| Lemma Docs | https://lemma.work/docs |
+| Lemma GitHub | https://github.com/lemma-work/lemma-platform |
+| Dexscreener API reference | https://docs.dexscreener.com/api/reference |
+| Dexscreener token-pairs endpoint | `GET https://api.dexscreener.com/token-pairs/v1/{chainId}/{tokenAddress}` |
+| Binance ticker price endpoint | `GET https://api.binance.com/api/v3/ticker/price?symbol={symbol}` |
+| PancakeSwap V2 Router (mainnet) | `0x10ED43C718714eb63d5aA57B78B54704E256024E` — verified via BscScan + PancakeSwap developer docs |
+| Hackathon page | https://unstop.com/hackathons/gappy-ai-hackathon-gappy-ai-1694233 |
+| Discord (support) | https://discord.gg/6dVR7zTvy |

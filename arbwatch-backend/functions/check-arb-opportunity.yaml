@@ -1,0 +1,4 @@
+name: check-arb-opportunity
+runtime: python3
+entrypoint: check-arb-opportunity.py
+description: Fetches DEX price from Dexscreener and CEX price from Binance API.

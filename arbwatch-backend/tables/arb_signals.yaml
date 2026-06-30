@@ -1,0 +1,9 @@
+name: arb_signals
+schema:
+  watchlist_token: text
+  gross_spread_usd: number
+  net_profit_usd: number
+  net_profit_pct: number
+  risk_note: text
+  status: text
+  detected_at: date

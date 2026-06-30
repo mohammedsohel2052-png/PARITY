@@ -1,0 +1,8 @@
+name: trade_log
+schema:
+  signal_id: text
+  trade_mode: text
+  wallet_address: text
+  simulated_net_profit_usd: number
+  executed_at: date
+  outcome_note: text

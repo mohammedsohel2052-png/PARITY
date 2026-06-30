@@ -1,0 +1,12 @@
+name: watchlist
+schema:
+  token_symbol: text
+  bsc_token_address: text
+  cex_symbol: text
+  min_net_profit_pct: number
+  trade_size_usd: number
+  status: text
+  last_dex_price: number
+  last_cex_price: number
+  last_net_profit_pct: number
+  last_checked_at: date
